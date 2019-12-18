@@ -5,6 +5,7 @@ Here is a guide how to setup and run Vault on your computer using docker contain
 ## Documentation 
 - [Vault](https://learn.hashicorp.com/vault/)
 - [vault_1.1.3](https://releases.hashicorp.com/vault/1.1.3/)
+- [HashiCorp Vault on AWS](https://aws.amazon.com/quickstart/architecture/vault/)
 
 ## Sources
 - [docker-image](https://github.com/testdrivenio/vault-consul-docker)
