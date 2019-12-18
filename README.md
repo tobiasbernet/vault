@@ -1,71 +1,321 @@
 # Managing Secrets with Vault and Consul
 
-This images uses [vault_1.1.3](https://releases.hashicorp.com/vault/1.1.3/)
+Here is a guide how to setup and run Vault on your computer using docker containers.
 
 ## Documentation 
-[Vault](https://learn.hashicorp.com/vault/)
+- [Vault](https://learn.hashicorp.com/vault/)
+- [vault_1.1.3](https://releases.hashicorp.com/vault/1.1.3/)
 
-## Sourcs
-[docker-image](https://github.com/testdrivenio/vault-consul-docker)
-[managing-secrets-with-vault-and-consul](https://testdriven.io/managing-secrets-with-vault-and-consul).
+## Sources
+- [docker-image](https://github.com/testdrivenio/vault-consul-docker)
+- [managing-secrets-with-vault-and-consul](https://testdriven.io/managing-secrets-with-vault-and-consul)
 
-## Build the image
-```sh
+
+# Setup your Vault Server
+
+## 1. Set environments
+
+Set the environment variable on the machine on which you install your vault server.
+```bash
+$ export VAULT_ADDR=http://127.0.0.1:8200
+```
+
+**Note:** If you not set this variable before you installing `Vault`, the service will automatically set the address to  `https://127.0.0.1:8200` (**https**).
+
+## 2. Build the images
+First create data volumes for your vault containers:
+```bash
+$ docker volume create vault_data consul_data
+$ docker volume create consul_data
+```
+**Note:** I wouldn't recommend mounting local directories. So you don't have to deal with permissions.
+
+Build the vault containers:
+```bash
 $ docker-compose up -d --build
 ```
 
-## Start vault
-1. Start the docker image
-```sh
-$ docker start viu_dev_vault
-$ docker start viu_dev_consul
-```
-2. You can now interact with both Vault and Consul. View the UIs at [http://localhost:8200/ui](http://localhost:8200/ui) and [http://localhost:8500/ui](http://localhost:8500/ui).
-
-
-### Initialize vault
-This values while installing it on a new server.
+After the build you should see the following output:
 ```bash
-# INITIAL ROOT TOKEN => token to login
-70fca32c-e29f-86e0-2f0a-a331624f10c8
-
-# KEY 1 => key to unseal the vault
-ArEAPPKvr17938VdnvmTGWR2Ibd5TiPfjJrA4Q0TgeI=
+Successfully built 180f113e84bc
+Successfully tagged vault_consul-worker:latest
+Creating viu_dev_consul ... done
+Creating viu_dev_vault         ... done
+Creating viu_dev_consul_worker ... done
 ```
 
-```json
-{
-    "keys": [
-      "02b1003cf2afaf5efddfc55d9ef99319647621b7794e23df8c9ac0e10d1381e2"
-    ],
-    "keys_base64": [
-      "ArEAPPKvr17938VdnvmTGWR2Ibd5TiPfjJrA4Q0TgeI="
-    ],
-    "root_token": "70fca32c-e29f-86e0-2f0a-a331624f10c8"
-  }
+The docker images are now build and running:
+```bash
+$ docker ps
+CONTAINER ID        IMAGE                 COMMAND                  CREATED              STATUS              PORTS                                                  NAMES
+2216e5acee75        vault_consul-worker   "consul agent -serve…"   About a minute ago   Up About a minute   8300/tcp, 8400/tcp, 8500/tcp, 8600/tcp                 viu_dev_consul_worker
+cde58d19f8d1        vault_vault           "vault server -confi…"   About a minute ago   Up About a minute   0.0.0.0:8200->8200/tcp                                 viu_dev_vault
+90246a1dc980        vault_consul          "consul agent -serve…"   About a minute ago   Up About a minute   8300/tcp, 8400/tcp, 8600/tcp, 0.0.0.0:8500->8500/tcp   viu_dev_consul
 ```
 
-## Create your first postgres database vault
-Please read the documentation first [Setup](https://www.vaultproject.io/docs/secrets/databases/postgresql.html#usage)
+The Service is now also accessible through your Browser: http://localhost:8200/ui.
 
-1) Login to the vault container: `docker exec -it viu_dev_vault /bin/bash`.
-2) Enable the database secret: `vault secrets enable database`.
-3) Configure the database connection:
+## 3. Unsealing Vault
+*When a Vault server is started, it starts in a sealed state. In this state, Vault is configured to know where and how to access the physical storage, but doesn't know how to decrypt any of it.*
+
+*Unsealing is the process of constructing the master key necessary to read the decryption key to decrypt the data, allowing access to the Vault.*
+
+To unseal your `Vault` run:
+```bash
+$ ./unseal-vault.sh
 ```
-vault write database/config/heidi_dev \
-    plugin_name=postgresql-database-plugin \
-    allowed_roles="ecto" \
-    connection_url="postgresql://{{username}}:{{password}}@10.10.11.165:5440/heidi_dev?sslmode=disable" \
-    username="postgres" \
-    password="postgress"
+
+The output of this script should look like:
+```bash
+...
+Key                    Value
+---                    -----
+Seal Type              shamir
+Initialized            true
+Sealed                 false
+Total Shares           5
+Threshold              3
+Version                1.1.3
+Cluster Name           vault-cluster-2a8a5b30
+Cluster ID             6e1eded5-3f48-02f9-bc06-fdacc2ad3fb8
+HA Enabled             true
+HA Cluster             n/a
+HA Mode                standby
+Active Node Address    <none>
 ```
-4) Configure a role:
+
+**Note:** It is important that the `Sealed` is `false`.
+
+The generated keys are now available in `keys.secrets` file (generated by `unseal-vault.sh` script).
+
+The content of the file looks like this:
+```bash
+Unseal Key 1: ioxIX...
+Unseal Key 2: qwJDC...
+Unseal Key 3: 5gcYo...
+Unseal Key 4: bPrDQ...
+Unseal Key 5: DVG41...
+
+Initial Root Token: s.tMP6m...
+
+Vault initialized with 5 key shares and a key threshold of 3. Please securely
+distribute the key shares printed above. When the Vault is re-sealed,
+restarted, or stopped, you must supply at least 3 of these keys to unseal it
+before it can start servicing requests.
+
+Vault does not store the generated master key. Without at least 3 key to
+reconstruct the master key, Vault will remain permanently sealed!
+
+It is possible to generate new unseal keys, provided you have a quorum of
+existing unseal keys shares. See "vault operator rekey" for more information.
 ```
-vault write database/roles/ecto \
-    db_name=heidi_dev \
-    creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
-        GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
-    default_ttl="1h" \
-    max_ttl="24h"
+
+**Note:** You have also the possibility to do these steps using the [UI](http://localhost:8200/ui).
+
+## 4. Configuration
+To access your docker images more easily, set an alias:
+```bash
+$ alias vault='docker exec -it viu_dev_vault vault "$@"'
+```
+
+Now you can use all [Vault CLI](https://www.vaultproject.io/docs/commands/index.html) commands from your machine without accessing the docker container.
+
+**Initial login**
+
+Since the alias is set. You can run the following command from your machine:
+```bash
+$ vault login $(grep 'Token:' keys.secrets | awk '{print $NF}')
+```
+
+Output:
+```bash
+Success! You are now authenticated. The token information displayed below
+is already stored in the token helper. You do NOT need to run "vault login"
+again. Future Vault requests will automatically use this token.
+
+Key                  Value
+---                  -----
+token                s.tMP6m...
+token_accessor       72W3z...
+token_duration       ∞
+token_renewable      false
+token_policies       ["root"]
+identity_policies    []
+policies             ["root"]
+```
+
+## 5. Finish
+
+Check your `Vault` status:
+```bash
+$ vault status
+Key             Value
+---             -----
+Seal Type       shamir
+Initialized     true
+Sealed          false
+Total Shares    5
+Threshold       3
+Version         1.1.3
+Cluster Name    vault-cluster-2a8a5b30
+Cluster ID      6e1eded5-3f48-02f9-bc06-fdacc2ad3fb8
+HA Enabled      true
+HA Cluster      https://172.20.0.2:8201
+HA Mode         active
 
 ```
+
+# Using Vault
+
+**Note:** The following commands (unless otherwise noted) can be executed from your local machine.
+
+## Create your first Secret
+Enable a secrets engine:
+```bash
+$ vault secrets enable kv
+Success! Enabled the kv secrets engine at: kv/
+```
+**Note:** For details on the specific configuration options, please see the [secrets engine documentation](https://www.vaultproject.io/docs/secrets/index.html).
+
+You have also the possibility to specify a specific path for your secret engine:
+```bash
+$ vault secrets enable kv
+Success! Enabled the kv secrets engine at: kv/
+
+$ vault secrets enable -path="db-heidi" database
+Success! Enabled the database secrets engine at: db-heidi/
+```
+
+The initial configuration is now complete. You can now start creating your first Secrets.
+```bash
+$ vault secrets enable -path="kv-heidi" kv
+Success! Enabled the kv secrets engine at: kv-heidi/
+```
+List your secrets:
+```bash
+$ vault secrets list
+Path          Type         Accessor              Description
+----          ----         --------              -----------
+cubbyhole/    cubbyhole    cubbyhole_dcbafe04    per-token private secret storage
+db-heidi/     database     database_d18e9df6     n/a
+identity/     identity     identity_96e6c6df     identity store
+kv-heidi/     kv           kv_9345bbcd           n/a
+kv/           kv           kv_55e5e87f           n/a
+sys/          system       system_7ccdf1fe       system endpoints used for control, policy and debugging
+```
+
+Add a key value:
+```bash
+$ vault kv put kv-heidi/creds passcode=my-long-passcode
+Success! Data written to: kv-heidi/creds
+```
+
+Read the data:
+```bash
+$ vault kv get kv-heidi/creds
+====== Data ======
+Key         Value
+---         -----
+passcode    my-long-passcode
+```
+
+We have made a simple example with the root token. Please do not use the root token for basic changes - create your own user. Keep the `keys.secrets` in a safe place and not on the `Vault` server.
+
+## Create a new policy/token for a specific User/Service
+
+As mentioned above, each user/service should have its own login/policy.
+
+**Example Use Case:**
+
+*You have a service called `Heidi` that as only certain rights for certain secrets.*
+
+At first a policy is created which defines certain access rights.
+
+**This command has to executed in the docker container!**
+```bash
+$ docker exec -it viu_dev_vault /bin/bash
+
+bash-4.4# vault policy write heidi -<<EOF 
+path "kv-heidi/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "db-heidi/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+EOF
+Success! Uploaded policy: heidi
+```
+Exit the container `CTRL-D`.
+
+Create a token using the new policy:
+```bash
+vault token create -policy=heidi > heidi.secrets
+```
+
+The content of the `heidi.secrets` file looks like this:
+```bash
+Key                  Value
+---                  -----
+token                s.AEbS...
+token_accessor       4wBRL..
+token_duration       768h
+token_renewable      true
+token_policies       ["default" "heidi"]
+identity_policies    []
+policies             ["default" "heidi"]
+```
+
+**Note:** Unlike the root token, it only has access to a specific policy `token_policies       ["default" "heidi"]`.
+
+Now set the token as environment variable `VAULT_TOKEN`:
+```bash
+$ export VAULT_TOKEN=`grep 'token' heidi.secrets | awk '{print $NF}' | head -1`
+$ echo $VAULT_TOKEN
+s.AEbS...
+```
+
+Let's login again with the new token:
+```bash
+$ vault login `echo $VAULT_TOKEN`
+Success! You are now authenticated. The token information displayed below
+is already stored in the token helper. You do NOT need to run "vault login"
+again. Future Vault requests will automatically use this token.
+
+Key                  Value
+---                  -----
+token                s.AEbS...
+token_accessor       4wBRL...
+token_duration       767h44m52s
+token_renewable      true
+token_policies       ["default" "heidi"]
+identity_policies    []
+policies             ["default" "heidi"]
+
+```
+
+## Create secrets using the new policy
+
+After you logged in as the new token you can start adding some new secrets:
+```bash
+$ vault kv put kv-heidi/peter passcode=my-friend
+Success! Data written to: kv-heidi/credsSuccess! Data written to: kv-heidi/peter
+```
+
+If you try to add a new secret to another path, you will get an error:
+```bash
+$ vault kv put kv/peter passcode=my-friend
+Error making API request.
+
+URL: GET http://127.0.0.1:8200/v1/sys/internal/ui/mounts/kv/peter
+Code: 403. Errors:
+
+* preflight capability check returned 403, please ensure client's policies grant access to path "kv/peter/"
+
+```
+
+**Note:** The specific token has only access to `kv-heidi` and `db-heidi` and not to the path `kv`.
+
+# Use Vault to manage database credentials.
+
+TODO.
