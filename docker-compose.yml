@@ -1,7 +1,5 @@
-version: '3.7'
-
+version: '3.3'
 services:
-
   vault:
     container_name: viu_dev_vault  
     build:
@@ -12,8 +10,8 @@ services:
     volumes:
       - ./vault/config:/vault/config
       - ./vault/policies:/vault/policies
-      - ./vault/data:/vault/data
-      - ./vault/logs:/vault/logs
+      - vault_data:/vault/data
+      - vault_data:/vault/logs
     environment:
       - VAULT_ADDR=http://127.0.0.1:8200
     command: server -config=/vault/config/vault-config.json
@@ -32,9 +30,10 @@ services:
     command: agent -server -bind 0.0.0.0 -client 0.0.0.0 -bootstrap-expect 1 -config-file=/consul/config/config.json
     volumes:
       - ./consul/config/consul-config.json:/consul/config/config.json
-      - ./consul/data:/consul/data
+      - consul_data:/consul/data
 
   consul-worker:
+    container_name: viu_dev_consul_worker
     build:
       context: ./consul
       dockerfile: Dockerfile
@@ -43,3 +42,11 @@ services:
       - ./consul/config/consul-config.json:/consul/config/config.json
     depends_on:
       - consul
+
+volumes:
+  vault_data: 
+    external:
+      name: vault_data
+  consul_data: 
+    external:
+      name: consul_data

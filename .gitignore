@@ -1,2 +1,2 @@
-# Consul data files
-/consul/data/*
+# Secret files
+*.secrets
