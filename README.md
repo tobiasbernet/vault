@@ -20,7 +20,7 @@ Set the environment variable on the machine on which you install your vault serv
 $ export VAULT_ADDR=http://127.0.0.1:8200
 ```
 
-**Note:** If you not set this variable before you installing `Vault`, the service will automatically set the address to  `https://127.0.0.1:8200` (**https**).
+**Note:** If you not set this variable before you installing [Vault](https://www.vaultproject.io/docs/install/index.html), the service will automatically set the address to  `https://127.0.0.1:8200` (**https**).
 
 ## 2. Build the images
 First create data volumes for your vault containers:
@@ -60,7 +60,7 @@ The Service is now also accessible through your Browser: http://localhost:8200/u
 
 *Unsealing is the process of constructing the master key necessary to read the decryption key to decrypt the data, allowing access to the Vault.*
 
-To unseal your `Vault` run:
+To unseal your [Vault](https://www.vaultproject.io/docs/concepts/seal.html) run:
 ```bash
 $ ./unseal-vault.sh
 ```
@@ -146,7 +146,7 @@ policies             ["root"]
 
 ## 5. Finish
 
-Check your `Vault` status:
+Check your [Vault](https://www.vaultproject.io/docs/commands/status.html) status:
 ```bash
 $ vault status
 Key             Value
@@ -219,7 +219,7 @@ Key         Value
 passcode    my-long-passcode
 ```
 
-We have made a simple example with the root token. Please do not use the root token for basic changes - create your own user. Keep the `keys.secrets` in a safe place and not on the `Vault` server.
+We have made a simple example with the root token. Please do not use the root token for basic changes - create your own user. Keep the `keys.secrets` in a safe place and not on the [Vault](https://www.vaultproject.io/) server.
 
 ## Create a new policy/token for a specific User/Service
 
